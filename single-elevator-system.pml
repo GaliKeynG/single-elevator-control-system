@@ -28,7 +28,7 @@ int isempty = 0;
 
 proctype elevator_control(){
     int clock =0;
-    door
+    do
     :: (clock >= SIM_TIME) ->
     printf("TEST OVER\n");
     break;
@@ -57,5 +57,40 @@ proctype elevator_control(){
         printf("do the down requests\n");
         down_pending[current_floor] = 0;
     }
+
+    // MAX_LOAD checking, only in when is not MAX_LOAD
+    if (current_load < MAX_LOAD){
+        current_load++;
+        printf("passengers in, current load%d%d\n", current_load, MAX_LOAD);
+    }else {
+        printf("Full load%d%d, reject new passengers\n", current_load, MAX_LOAD);
+
+    }
+    door_is_open = 0;
+    printf("Close\n");
+    ：：（next_target > current_floor）->
+    current_floor++; //need to go up
+    printf("Time%d: up to%dfloor (target:%dfloor)\n", clock, current_floor, next_target);
+    moving direction = 1;
+    ::(next_target < current_floor) ->
+    current_floor--; //need to go down
+    printf("Time%d: down to%dfloor(target:%dfloor)\n", clock, current_floor, next_target);
+    moving_direction = -1;
+    fi;
+
+    clock++;
+    od;
+
 }
 
+//system initialization
+intit{
+    //reset all requests to zero
+    int i;
+    for (i in internal_requests){internal_requests[i] = 0;}
+    for (i in up_pending){up_pending[i] = 0;}
+    for (i in down_pending){down_pending[i] = 0;}
+
+    printf("Starting Elevator Control System (MAX LOAD: %d)", MAX_LOAD);
+    run elevator_control();
+}
