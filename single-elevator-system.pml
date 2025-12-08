@@ -24,7 +24,6 @@ int incoming_requests[SIM_TIME + 1] = {0, 3, 5, 2, 0, 9, 0, 0, 0, 0, 0, 0, 4, 0,
 // Simple scheduling logic: find the nearest request
 inline calculate_target() {
     // Simplified logic: if no target exists, pick a pending request
-    // In a real system, a SCAN (Elevator) algorithm would be implemented here
     if (next_target == -1 || next_target == current_floor) {
         int i;
         next_target = -1; // Reset target
