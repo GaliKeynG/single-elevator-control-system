@@ -78,30 +78,32 @@ inline read_input(t) {
 
 proctype elevator() {
     int t = 0;
-    int i = 0;    // Loop counter
-    int dest = 0; // Temp destination
+    int i = 0;    
+    int dest = 0; 
 
-    // Manual setup for test inputs
-    inputs[1] = 3; inputs[2] = 5; inputs[3] = 2; inputs[5] = 9; inputs[12] = 4;
+    // Manual input setup
+    // writing line by line is easier to debug
+    inputs[1] = 3; 
+    inputs[2] = 5; 
+    inputs[3] = 2; 
+    inputs[5] = 9; 
+    inputs[12] = 4;
     
     do
-    :: (t >= TIMEOUT) -> 
-        printf("Simulation finished.\n");
-        break;
-        
     :: (t < TIMEOUT) ->
         read_input(t);
         update_target();
 
-        printf("T=%d | F:%d | Load:%d | Dest:%d | ", t, cur_floor, load, target);
+        // Print status (simplified format)
+        printf("Time %d: At %d, Load %d, Target %d\n", t, cur_floor, load, target);
 
         if
         :: (target == -1) -> 
             dir = STOP;
-            printf("Idle\n");
+            printf("... Idle\n");
             
         :: (target == cur_floor) ->
-            printf("Open Door. ");
+            printf("... Door Open. ");
             
             // Unload
             if
@@ -111,7 +113,7 @@ proctype elevator() {
                 :: (load > 0) -> load--;
                 :: else -> skip;
                 fi;
-                printf("Out. ");
+                printf("Unload. ");
             :: else -> skip;
             fi;
             
@@ -124,14 +126,14 @@ proctype elevator() {
                 if
                 :: (load < MAX_CAP) ->
                     load++;
-                    // Logic: User wants to go to (floor + 2)
+                    // Logic: passenger goes to floor + 2
                     dest = (cur_floor + 2); 
                     if
                     :: (dest > FLOORS) -> dest = 1;
                     :: else -> skip;
                     fi;
                     req_inner[dest] = 1; 
-                    printf("In(to %d). ", dest);
+                    printf("Load (dest %d). ", dest);
                 :: else -> 
                     printf("Full! ");
                 fi;
@@ -139,20 +141,24 @@ proctype elevator() {
             fi;
             
             printf("\n");
-            target = -1; // Reset target
+            target = -1; 
             
         :: (target > cur_floor && target != -1) ->
             dir = UP;
             cur_floor++;
-            printf("Going UP\n");
+            printf("... Moving UP\n");
             
         :: (target < cur_floor && target != -1) ->
             dir = DOWN;
             cur_floor--;
-            printf("Going DOWN\n");
+            printf("... Moving DOWN\n");
         fi;
         
         t++;
+
+    :: (t == TIMEOUT) -> 
+        printf("Test Done.\n"); // Simple exit message
+        break;
     od;
 }
 
