@@ -16,47 +16,48 @@ bool req_up[FLOORS + 1];
 bool req_down[FLOORS + 1];
 bool req_inner[FLOORS + 1]; 
 
-// Simple test sequence (0 means no input at that tick)
-// Note: Manual initialization is safer in older Spin versions
+// Simple test sequence
 int inputs[TIMEOUT + 1];
 
 // Helper: Determine where to go next
-// Logic: Simple linear scan 
 inline update_target() {
+    // Only look for a new target if we don't have one or just arrived
     if
     :: (target == -1 || target == cur_floor) ->
         target = -1;
-        i = 1; // Use process-local 'i'
+        i = 1; 
         
-        // Priority 1: Drop off passengers (Check inner requests)
+        // Priority 1: Check inner requests first
         do
         :: (i <= FLOORS) ->
             if
             :: (req_inner[i]) -> 
                 target = i; 
-                goto found_target; // Jump out of loop
+                break; // Found one, stop looking
             :: else -> skip;
             fi;
             i++;
         :: (i > FLOORS) -> break;
         od;
         
-        // Priority 2: Pick up new ones (Check outer requests)
-        i = 1;
-        do
-        :: (i <= FLOORS) ->
-            if
-            :: (req_up[i] || req_down[i]) ->
-                target = i;
-                goto found_target;
-            :: else -> skip;
-            fi;
-            i++;
-        :: (i > FLOORS) -> break;
-        od;
+        // Priority 2: Check outer requests (only if we didn't find an inner one)
+        if
+        :: (target == -1) ->
+            i = 1;
+            do
+            :: (i <= FLOORS) ->
+                if
+                :: (req_up[i] || req_down[i]) ->
+                    target = i;
+                    break; // Found one, stop looking
+                :: else -> skip;
+                fi;
+                i++;
+            :: (i > FLOORS) -> break;
+            od;
+        :: else -> skip;
+        fi;
 
-        found_target: skip; // Label to jump to
-        
     :: else -> skip;
     fi;
 }
@@ -77,10 +78,10 @@ inline read_input(t) {
 
 proctype elevator() {
     int t = 0;
-    int i = 0; // Scratch variable for loops
-    int dest = 0; // Temp variable for destination
+    int i = 0;    // Loop counter
+    int dest = 0; // Temp destination
 
-    // Initialize inputs manually to avoid array syntax issues
+    // Manual setup for test inputs
     inputs[1] = 3; inputs[2] = 5; inputs[3] = 2; inputs[5] = 9; inputs[12] = 4;
     
     do
@@ -102,7 +103,7 @@ proctype elevator() {
         :: (target == cur_floor) ->
             printf("Open Door. ");
             
-            // Someone gets out
+            // Unload
             if
             :: (req_inner[cur_floor]) ->
                 req_inner[cur_floor] = 0;
@@ -114,7 +115,7 @@ proctype elevator() {
             :: else -> skip;
             fi;
             
-            // Someone gets in
+            // Load
             if
             :: (req_up[cur_floor] || req_down[cur_floor]) ->
                 req_up[cur_floor] = 0;
@@ -123,7 +124,7 @@ proctype elevator() {
                 if
                 :: (load < MAX_CAP) ->
                     load++;
-                    // Sim: User goes to next floor + 2
+                    // Logic: User wants to go to (floor + 2)
                     dest = (cur_floor + 2); 
                     if
                     :: (dest > FLOORS) -> dest = 1;
@@ -138,7 +139,7 @@ proctype elevator() {
             fi;
             
             printf("\n");
-            target = -1; // Done here
+            target = -1; // Reset target
             
         :: (target > cur_floor && target != -1) ->
             dir = UP;
