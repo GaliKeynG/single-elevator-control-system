@@ -1,168 +1,202 @@
-#define FLOORS 10
-#define TIMEOUT 20
-#define MAX_CAP 5
-#define STOP 0
-#define UP 1
-#define DOWN -1
+#define N 10   
+#define MAX_T 20
+#define MAX_P 5 
 
-// Global variables
-int cur_floor = 1;
-int dir = STOP;
-int load = 0;
-int target = -1; // -1 means no target
+// 0:stop, 1:up, -1:down
+int floor = 1;
+int dir = 0; 
+int pass = 0; // passengers count
+int goal = -1; 
 
-// Requests arrays (index 1 to 10)
-bool req_up[FLOORS + 1];
-bool req_down[FLOORS + 1];
-bool req_inner[FLOORS + 1]; 
+// request arrays
+bool r_up[N+1];
+bool r_down[N+1];
+bool r_in[N+1]; 
 
-// Simple test sequence
-int inputs[TIMEOUT + 1];
+// test input
+int test_seq[MAX_T+1];
 
-// Helper: Determine where to go next
-inline update_target() {
-    // Only look for a new target if we don't have one or just arrived
-    if
-    :: (target == -1 || target == cur_floor) ->
-        target = -1;
-        i = 1; 
-        
-        // Priority 1: Check inner requests first
-        do
-        :: (i <= FLOORS) ->
-            if
-            :: (req_inner[i]) -> 
-                target = i; 
-                break; // Found one, stop looking
-            :: else -> skip;
-            fi;
-            i++;
-        :: (i > FLOORS) -> break;
-        od;
-        
-        // Priority 2: Check outer requests (only if we didn't find an inner one)
+// logic to find next floor
+inline find_next() {
+    goal = -1;
+    
+    // 1. check people inside
+    i = 1;
+    do
+    :: (i <= N) ->
         if
-        :: (target == -1) ->
-            i = 1;
+        :: (r_in[i]) -> goal = i; goto found;
+        :: else -> skip;
+        fi;
+        i++;
+    :: (i > N) -> break;
+    od;
+
+    // 2. check people outside
+    if
+    :: (goal == -1) ->
+        // if going up or stop, check upper floors first
+        if
+        :: (dir >= 0) -> 
+            i = floor;
             do
-            :: (i <= FLOORS) ->
+            :: (i <= N) ->
                 if
-                :: (req_up[i] || req_down[i]) ->
-                    target = i;
-                    break; // Found one, stop looking
+                :: (r_up[i] || r_down[i]) -> goal = i; goto found;
                 :: else -> skip;
                 fi;
                 i++;
-            :: (i > FLOORS) -> break;
+            :: (i > N) -> break;
             od;
-        :: else -> skip;
-        fi;
-
-    :: else -> skip;
-    fi;
-}
-
-// Helper: Read input sequence
-inline read_input(t) {
-    int f = inputs[t];
-    if
-    :: (f > 0 && f <= FLOORS) ->
-        printf("DEBUG: Button pressed at floor %d\n", f);
-        if
-        :: (f < FLOORS) -> req_up[f] = 1;
-        :: else -> req_down[f] = 1;
-        fi;
-    :: else -> skip;
-    fi;
-}
-
-proctype elevator() {
-    int t = 0;
-    int i = 0;    
-    int dest = 0; 
-
-    // Manual input setup
-    // writing line by line is easier to debug
-    inputs[1] = 3; 
-    inputs[2] = 5; 
-    inputs[3] = 2; 
-    inputs[5] = 9; 
-    inputs[12] = 4;
-    
-    do
-    :: (t < TIMEOUT) ->
-        read_input(t);
-        update_target();
-
-        // Print status (simplified format)
-        printf("Time %d: At %d, Load %d, Target %d\n", t, cur_floor, load, target);
-
-        if
-        :: (target == -1) -> 
-            dir = STOP;
-            printf("... Idle\n");
             
-        :: (target == cur_floor) ->
-            printf("... Door Open. ");
-            
-            // Unload
-            if
-            :: (req_inner[cur_floor]) ->
-                req_inner[cur_floor] = 0;
+            // if not found, check lower floors (from bottom)
+            i = 1;
+            do
+            :: (i < floor) ->
                 if
-                :: (load > 0) -> load--;
+                :: (r_up[i] || r_down[i]) -> goal = i; goto found;
                 :: else -> skip;
                 fi;
-                printf("Unload. ");
+                i++;
+            :: (i >= floor) -> break;
+            od;
+
+        // if going down, check lower floors first
+        :: (dir == -1) -> 
+            i = floor;
+            do
+            :: (i >= 1) ->
+                if
+                :: (r_up[i] || r_down[i]) -> goal = i; goto found;
+                :: else -> skip;
+                fi;
+                i--;
+            :: (i < 1) -> break;
+            od;
+
+            // if not found, check upper floors (from top)
+            i = N;
+            do
+            :: (i > floor) ->
+                if
+                :: (r_up[i] || r_down[i]) -> goal = i; goto found;
+                :: else -> skip;
+                fi;
+                i--;
+            :: (i <= floor) -> break;
+            od;
+        fi;
+    :: else -> skip;
+    fi;
+
+    found: skip;
+}
+
+// read test data
+inline get_input(time) {
+    int val = test_seq[time];
+    if
+    :: (val > 0 && val <= N) ->
+        printf("BTN: floor %d pressed\n", val);
+        if
+        :: (val < N) -> r_up[val] = 1;
+        :: else -> r_down[val] = 1;
+        fi;
+    :: else -> skip;
+    fi;
+}
+
+proctype main_ctrl() {
+    int t = 0;
+    int i = 0;    
+    int next_f = 0; 
+
+    // setup test cases
+    test_seq[1] = 3; 
+    test_seq[2] = 2; // intercept test
+    test_seq[3] = 5; 
+    test_seq[12] = 4;
+    
+    do
+    :: (t < MAX_T) ->
+        get_input(t);
+        find_next();
+
+        printf("T=%d | F=%d | Load=%d | Goal=%d\n", t, floor, pass, goal);
+
+        if
+        :: (goal == -1) -> 
+            dir = 0;
+            printf("Status: IDLE\n");
+            
+        :: (goal == floor) ->
+            printf("Status: DOOR OPEN. ");
+            
+            // someone out
+            if
+            :: (r_in[floor]) ->
+                r_in[floor] = 0;
+                if :: (pass > 0) -> pass--; :: else -> skip; fi;
+                printf("OUT. ");
             :: else -> skip;
             fi;
             
-            // Load
+            // someone in
             if
-            :: (req_up[cur_floor] || req_down[cur_floor]) ->
-                req_up[cur_floor] = 0;
-                req_down[cur_floor] = 0;
+            :: (r_up[floor] || r_down[floor]) ->
+                r_up[floor] = 0;
+                r_down[floor] = 0;
                 
                 if
-                :: (load < MAX_CAP) ->
-                    load++;
-                    // Logic: passenger goes to floor + 2
-                    dest = (cur_floor + 2); 
-                    if
-                    :: (dest > FLOORS) -> dest = 1;
-                    :: else -> skip;
-                    fi;
-                    req_inner[dest] = 1; 
-                    printf("Load (dest %d). ", dest);
+                :: (pass < MAX_P) ->
+                    pass++;
+                    // sim: go to floor + 2
+                    next_f = floor + 2; 
+                    if :: (next_f > N) -> next_f = 1; :: else -> skip; fi;
+                    r_in[next_f] = 1; 
+                    printf("IN (to %d). ", next_f);
                 :: else -> 
-                    printf("Full! ");
+                    printf("FULL! ");
                 fi;
             :: else -> skip;
             fi;
             
             printf("\n");
-            target = -1; 
+            // don't reset goal here, let next loop handle it
             
-        :: (target > cur_floor && target != -1) ->
-            dir = UP;
-            cur_floor++;
-            printf("... Moving UP\n");
+        :: (goal > floor && goal != -1) ->
+            dir = 1;
+            floor++;
+            printf("Status: UP\n");
             
-        :: (target < cur_floor && target != -1) ->
-            dir = DOWN;
-            cur_floor--;
-            printf("... Moving DOWN\n");
+        :: (goal < floor && goal != -1) ->
+            dir = -1;
+            floor--;
+            printf("Status: DOWN\n");
         fi;
         
         t++;
 
-    :: (t == TIMEOUT) -> 
-        printf("Test Done.\n"); // Simple exit message
+    :: (t == MAX_T) -> 
+        printf("End.\n"); 
         break;
     od;
 }
 
 init {
-    printf("Elevator System Start (Cap: %d)\n", MAX_CAP);
-    run elevator();
+    printf("Elevator Start (Max Load: %d)\n", MAX_P);
+    run main_ctrl();
 }
+
+/* LTL Formulas for verification 
+   Checking safety and liveness
+*/
+
+// 1. Safety: Floor must always be within range (1 to N)
+ltl p_valid_floor { [] (floor >= 1 && floor <= N) }
+// 2. Safety: Passengers must never exceed Max Capacity
+ltl p_safe_load { [] (pass >= 0 && pass <= MAX_P) }
+// 3. Logic Safety: If moving (dir is not 0), we must have a goal
+ltl p_moving_valid { [] (dir != 0 -> goal != -1) }
+// 4. Liveness: If we have a goal, eventually we will finish it (goal resets to -1)
+ltl p_progress { [] ( (goal != -1) -> <> (goal == -1) ) }
